@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils"
 import { format } from "date-fns"
 import { CalendarIcon, Send } from "lucide-react"
 import { ContactsList } from "@/components/whatsapp/contacts-list"
+import { useWhatsApp } from "@/lib/hooks/use-whatsapp"
 
 const formSchema = z.object({
   contact: z.string({
@@ -47,7 +48,9 @@ export function ChatInterface() {
     },
   })
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
+  const { sendMessage, scheduleMessage } = useWhatsApp()
+
+  async function onSubmit(values: z.infer<typeof formSchema>) {
     if (form.getValues("contact") === "") {
       form.setError("contact", {
         type: "manual",
@@ -56,25 +59,24 @@ export function ChatInterface() {
       return
     }
 
-    console.log(values)
-
-    // Simulate sending message
     setIsSending(true)
-    setTimeout(() => {
-      setIsSending(false)
+
+    try {
+      await sendMessage({
+        contact: values.contact,
+        message: values.message,
+        count: values.count,
+      })
       form.reset()
       setSelectedContact("")
-    }, 1500)
-
-    // In a real app, you would call your API here
-    // const response = await fetch("/api/whatsapp/send", {
-    //   method: "POST",
-    //   headers: { "Content-Type": "application/json" },
-    //   body: JSON.stringify(values),
-    // });
+    } catch (error) {
+      console.error("Failed to send message:", error)
+    } finally {
+      setIsSending(false)
+    }
   }
 
-  function onSchedule(values: z.infer<typeof formSchema>) {
+  async function onSchedule(values: z.infer<typeof formSchema>) {
     if (form.getValues("contact") === "") {
       form.setError("contact", {
         type: "manual",
@@ -99,22 +101,23 @@ export function ChatInterface() {
       return
     }
 
-    console.log(values)
-
-    // Simulate scheduling message
     setIsScheduling(true)
-    setTimeout(() => {
-      setIsScheduling(false)
+
+    try {
+      await scheduleMessage({
+        contact: values.contact,
+        message: values.message,
+        count: values.count,
+        date: values.date,
+        time: values.time,
+      })
       form.reset()
       setSelectedContact("")
-    }, 1500)
-
-    // In a real app, you would call your API here
-    // const response = await fetch("/api/whatsapp/schedule", {
-    //   method: "POST",
-    //   headers: { "Content-Type": "application/json" },
-    //   body: JSON.stringify(values),
-    // });
+    } catch (error) {
+      console.error("Failed to schedule message:", error)
+    } finally {
+      setIsScheduling(false)
+    }
   }
 
   return (

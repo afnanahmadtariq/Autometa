@@ -11,6 +11,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { Icons } from "@/components/icons"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 const formSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address" }),
@@ -21,8 +22,10 @@ const formSchema = z.object({
 
 export function LoginForm() {
   const router = useRouter()
+  const { login } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -34,21 +37,14 @@ export function LoginForm() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true)
+    setError(null)
 
     try {
-      // Simulate API call
-      console.log(values)
-      // In a real app, you would call your API here
-      // const response = await fetch("/api/auth/login", {
-      //   method: "POST",
-      //   headers: { "Content-Type": "application/json" },
-      //   body: JSON.stringify(values),
-      // });
-
-      // Redirect to 2FA verification
-      router.push("/verify-2fa")
+      await login(values.email, values.password)
+      // Auth provider will handle the redirect
     } catch (error) {
       console.error(error)
+      setError(error instanceof Error ? error.message : "Failed to log in")
     } finally {
       setIsLoading(false)
     }
@@ -58,16 +54,11 @@ export function LoginForm() {
     setIsGoogleLoading(true)
 
     try {
-      // Simulate Google sign-in
-      // In a real app, you would call your API here
-      // const response = await fetch("/api/auth/google", {
-      //   method: "GET",
-      // });
-
-      // Redirect to dashboard or 2FA verification
-      router.push("/verify-2fa")
+      // Redirect to Google OAuth URL
+      window.location.href = "/api/auth/google"
     } catch (error) {
       console.error(error)
+      setError(error instanceof Error ? error.message : "Failed to sign in with Google")
     } finally {
       setIsGoogleLoading(false)
     }
@@ -75,6 +66,7 @@ export function LoginForm() {
 
   return (
     <div className="space-y-6">
+      {error && <div className="rounded-md bg-destructive/15 p-3 text-sm text-destructive">{error}</div>}
       <Button
         variant="outline"
         type="button"

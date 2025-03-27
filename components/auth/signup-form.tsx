@@ -11,6 +11,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { Icons } from "@/components/icons"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 const formSchema = z
   .object({
@@ -30,8 +31,10 @@ const formSchema = z
 
 export function SignupForm() {
   const router = useRouter()
+  const { signup } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -45,21 +48,14 @@ export function SignupForm() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true)
+    setError(null)
 
     try {
-      // Simulate API call
-      console.log(values)
-      // In a real app, you would call your API here
-      // const response = await fetch("/api/auth/signup", {
-      //   method: "POST",
-      //   headers: { "Content-Type": "application/json" },
-      //   body: JSON.stringify(values),
-      // });
-
-      // Redirect to 2FA setup
-      router.push("/setup-2fa")
+      await signup(values.name, values.email, values.password)
+      // Auth provider will handle the redirect
     } catch (error) {
       console.error(error)
+      setError(error instanceof Error ? error.message : "Failed to sign up")
     } finally {
       setIsLoading(false)
     }
@@ -69,16 +65,11 @@ export function SignupForm() {
     setIsGoogleLoading(true)
 
     try {
-      // Simulate Google sign-up
-      // In a real app, you would call your API here
-      // const response = await fetch("/api/auth/google", {
-      //   method: "GET",
-      // });
-
-      // Redirect to 2FA setup
-      router.push("/setup-2fa")
+      // Redirect to Google OAuth URL from our API
+      window.location.href = "/api/auth/google"
     } catch (error) {
       console.error(error)
+      setError(error instanceof Error ? error.message : "Failed to sign up with Google")
     } finally {
       setIsGoogleLoading(false)
     }
@@ -86,6 +77,7 @@ export function SignupForm() {
 
   return (
     <div className="space-y-6">
+      {error && <div className="rounded-md bg-destructive/15 p-3 text-sm text-destructive">{error}</div>}
       <Button
         variant="outline"
         type="button"

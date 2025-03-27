@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
@@ -11,6 +11,9 @@ import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { WhatsappConnect } from "@/components/whatsapp/whatsapp-connect"
 import { Icons } from "@/components/icons"
+import { useAuth } from "@/lib/hooks/use-auth"
+import { useWhatsApp } from "@/lib/hooks/use-whatsapp"
+import { updateUserProfile, updateUserPassword } from "@/lib/api/user"
 
 const profileFormSchema = z.object({
   name: z
@@ -42,17 +45,28 @@ const passwordFormSchema = z
   })
 
 export function SettingsTabs() {
-  const [isConnected, setIsConnected] = useState(false)
+  const { user } = useAuth()
+  const { isConnected } = useWhatsApp()
+  const { disconnect } = useWhatsApp()
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false)
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const profileForm = useForm<z.infer<typeof profileFormSchema>>({
     resolver: zodResolver(profileFormSchema),
     defaultValues: {
-      name: "John Doe",
-      email: "john.doe@example.com",
+      name: user?.name || "",
+      email: user?.email || "",
     },
   })
+
+  // Update form values when user data changes
+  useEffect(() => {
+    if (user) {
+      profileForm.setValue("name", user.name || "")
+      profileForm.setValue("email", user.email || "")
+    }
+  }, [user, profileForm])
 
   const passwordForm = useForm<z.infer<typeof passwordFormSchema>>({
     resolver: zodResolver(passwordFormSchema),
@@ -63,43 +77,41 @@ export function SettingsTabs() {
     },
   })
 
-  function onProfileSubmit(values: z.infer<typeof profileFormSchema>) {
+  async function onProfileSubmit(values: z.infer<typeof profileFormSchema>) {
     setIsUpdatingProfile(true)
+    setError(null)
 
-    // Simulate API call
-    setTimeout(() => {
-      console.log(values)
+    try {
+      await updateUserProfile(values)
+    } catch (error) {
+      console.error(error)
+      setError(error instanceof Error ? error.message : "Failed to update profile")
+    } finally {
       setIsUpdatingProfile(false)
-    }, 1000)
-
-    // In a real app, you would call your API here
-    // const response = await fetch("/api/user/profile", {
-    //   method: "PUT",
-    //   headers: { "Content-Type": "application/json" },
-    //   body: JSON.stringify(values),
-    // });
+    }
   }
 
-  function onPasswordSubmit(values: z.infer<typeof passwordFormSchema>) {
+  async function onPasswordSubmit(values: z.infer<typeof passwordFormSchema>) {
     setIsUpdatingPassword(true)
+    setError(null)
 
-    // Simulate API call
-    setTimeout(() => {
-      console.log(values)
-      setIsUpdatingPassword(false)
+    try {
+      await updateUserPassword({
+        currentPassword: values.currentPassword,
+        newPassword: values.newPassword,
+      })
       passwordForm.reset()
-    }, 1000)
-
-    // In a real app, you would call your API here
-    // const response = await fetch("/api/user/password", {
-    //   method: "PUT",
-    //   headers: { "Content-Type": "application/json" },
-    //   body: JSON.stringify(values),
-    // });
+    } catch (error) {
+      console.error(error)
+      setError(error instanceof Error ? error.message : "Failed to update password")
+    } finally {
+      setIsUpdatingPassword(false)
+    }
   }
 
   return (
     <Tabs defaultValue="account" className="space-y-4">
+      {error && <div className="rounded-md bg-destructive/15 p-3 text-sm text-destructive">{error}</div>}
       <TabsList>
         <TabsTrigger value="account">Account</TabsTrigger>
         <TabsTrigger value="password">Password</TabsTrigger>
@@ -220,7 +232,7 @@ export function SettingsTabs() {
           </CardHeader>
           <CardContent className="space-y-4">
             {!isConnected ? (
-              <WhatsappConnect onConnected={() => setIsConnected(true)} />
+              <WhatsappConnect onConnected={() => {}} />
             ) : (
               <div className="space-y-4">
                 <div className="flex items-center space-x-2 rounded-md bg-primary/10 px-3 py-2 text-sm text-primary">
@@ -230,7 +242,7 @@ export function SettingsTabs() {
                   </span>
                   <span>Connected to WhatsApp</span>
                 </div>
-                <Button variant="outline" className="w-full" onClick={() => setIsConnected(false)}>
+                <Button variant="outline" className="w-full" onClick={() => disconnect()}>
                   Disconnect
                 </Button>
               </div>

@@ -1,6 +1,8 @@
 import type React from "react"
 import { Inter } from "next/font/google"
 import { ThemeProvider } from "@/components/theme-provider"
+import { AuthProvider } from "@/lib/hooks/use-auth"
+import { WhatsAppProvider } from "@/lib/hooks/use-whatsapp"
 import "./globals.css"
 import type { Metadata } from "next"
 
@@ -21,7 +23,9 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.className} antialiased`}>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} disableTransitionOnChange>
-          {children}
+          <AuthProvider>
+            <WhatsAppProvider>{children}</WhatsAppProvider>
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

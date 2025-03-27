@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Icons } from "@/components/icons"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 const formSchema = z.object({
   code: z.string().min(6, {
@@ -18,7 +19,9 @@ const formSchema = z.object({
 
 export function TwoFactorVerifyForm() {
   const router = useRouter()
+  const { verifyTwoFactor } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -29,21 +32,14 @@ export function TwoFactorVerifyForm() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true)
+    setError(null)
 
     try {
-      // Simulate API call
-      console.log(values)
-      // In a real app, you would call your API here
-      // const response = await fetch("/api/auth/verify-2fa", {
-      //   method: "POST",
-      //   headers: { "Content-Type": "application/json" },
-      //   body: JSON.stringify(values),
-      // });
-
-      // Redirect to dashboard
-      router.push("/dashboard")
+      await verifyTwoFactor(values.code)
+      // Auth provider will handle the redirect
     } catch (error) {
       console.error(error)
+      setError(error instanceof Error ? error.message : "Failed to verify authentication code")
     } finally {
       setIsLoading(false)
     }
@@ -52,6 +48,7 @@ export function TwoFactorVerifyForm() {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        {error && <div className="rounded-md bg-destructive/15 p-3 text-sm text-destructive">{error}</div>}
         <FormField
           control={form.control}
           name="code"

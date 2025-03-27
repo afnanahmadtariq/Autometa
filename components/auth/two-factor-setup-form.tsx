@@ -10,6 +10,7 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Input } from "@/components/ui/input"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Icons } from "@/components/icons"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 const formSchema = z.object({
   method: z.enum(["totp", "email"], {
@@ -20,9 +21,11 @@ const formSchema = z.object({
 
 export function TwoFactorSetupForm() {
   const router = useRouter()
+  const { setupTwoFactor, verifyTwoFactor } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
   const [showVerification, setShowVerification] = useState(false)
-  const [qrCodeUrl, setQrCodeUrl] = useState("/placeholder.svg?height=200&width=200")
+  const [qrCodeUrl, setQrCodeUrl] = useState("")
+  const [error, setError] = useState<string | null>(null)
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -35,37 +38,32 @@ export function TwoFactorSetupForm() {
   const method = form.watch("method")
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
+    setError(null)
+
     if (!showVerification) {
-      setShowVerification(true)
-      // In a real app, you would fetch the QR code or send the email here
-      // const response = await fetch("/api/auth/setup-2fa", {
-      //   method: "POST",
-      //   headers: { "Content-Type": "application/json" },
-      //   body: JSON.stringify({ method: values.method }),
-      // });
-      // if (values.method === "totp") {
-      //   const data = await response.json();
-      //   setQrCodeUrl(data.qrCode);
-      // }
+      setIsLoading(true)
+      try {
+        const response = await setupTwoFactor(values.method)
+        setShowVerification(true)
+        if (values.method === "totp" && response.qrCode) {
+          setQrCodeUrl(response.qrCode)
+        }
+      } catch (error) {
+        console.error(error)
+        setError(error instanceof Error ? error.message : "Failed to setup 2FA")
+      } finally {
+        setIsLoading(false)
+      }
       return
     }
 
     setIsLoading(true)
-
     try {
-      // Simulate API call
-      console.log(values)
-      // In a real app, you would verify the code here
-      // const response = await fetch("/api/auth/verify-2fa", {
-      //   method: "POST",
-      //   headers: { "Content-Type": "application/json" },
-      //   body: JSON.stringify(values),
-      // });
-
-      // Redirect to dashboard
-      router.push("/dashboard")
+      await verifyTwoFactor(values.code || "", method)
+      // Auth provider will handle the redirect
     } catch (error) {
       console.error(error)
+      setError(error instanceof Error ? error.message : "Failed to verify 2FA code")
     } finally {
       setIsLoading(false)
     }
@@ -74,6 +72,7 @@ export function TwoFactorSetupForm() {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        {error && <div className="rounded-md bg-destructive/15 p-3 text-sm text-destructive">{error}</div>}
         {!showVerification ? (
           <FormField
             control={form.control}
@@ -116,7 +115,7 @@ export function TwoFactorSetupForm() {
                   <h3 className="text-lg font-medium">Scan the QR code with your authenticator app</h3>
                   <div className="mt-4 flex justify-center">
                     <img
-                      src={qrCodeUrl || "/placeholder.svg"}
+                      src={qrCodeUrl || "/placeholder.svg?height=200&width=200"}
                       alt="QR Code for authenticator app"
                       className="h-48 w-48 rounded-md border"
                     />

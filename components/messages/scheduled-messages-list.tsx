@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
@@ -9,95 +9,44 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { MoreHorizontal } from "lucide-react"
+import { useWhatsApp } from "@/lib/hooks/use-whatsapp"
 
 export function ScheduledMessagesList() {
   const [searchTerm, setSearchTerm] = useState("")
   const [filter, setFilter] = useState("all")
+  const { scheduledMessages, refreshScheduledMessages, cancelScheduledMessage } = useWhatsApp()
 
-  const messages = [
-    {
-      id: "1",
-      contact: "Marketing Team",
-      message: "Weekly newsletter",
-      date: "Apr 29, 2023",
-      time: "5:00 PM",
-      count: 1,
-      status: "pending",
-    },
-    {
-      id: "2",
-      contact: "Client Meeting",
-      message: "Meeting reminder for tomorrow",
-      date: "Apr 29, 2023",
-      time: "8:00 PM",
-      count: 1,
-      status: "pending",
-    },
-    {
-      id: "3",
-      contact: "Support Team",
-      message: "Customer follow-up",
-      date: "Apr 30, 2023",
-      time: "9:00 AM",
-      count: 3,
-      status: "pending",
-    },
-    {
-      id: "4",
-      contact: "Sales Department",
-      message: "Monthly report distribution",
-      date: "May 1, 2023",
-      time: "10:00 AM",
-      count: 5,
-      status: "pending",
-    },
-    {
-      id: "5",
-      contact: "Team Leads",
-      message: "Project deadline reminder",
-      date: "May 3, 2023",
-      time: "9:00 AM",
-      count: 1,
-      status: "pending",
-    },
-    {
-      id: "6",
-      contact: "HR Department",
-      message: "Team building event details",
-      date: "May 5, 2023",
-      time: "3:00 PM",
-      count: 1,
-      status: "pending",
-    },
-    {
-      id: "7",
-      contact: "Product Team",
-      message: "Release announcement",
-      date: "May 10, 2023",
-      time: "10:00 AM",
-      count: 3,
-      status: "pending",
-    },
-    {
-      id: "8",
-      contact: "Customer Success",
-      message: "Quarterly review invitation",
-      date: "May 15, 2023",
-      time: "2:00 PM",
-      count: 1,
-      status: "pending",
-    },
-  ]
+  useEffect(() => {
+    refreshScheduledMessages()
+  }, [refreshScheduledMessages])
 
-  const filteredMessages = messages.filter((message) => {
+  const filteredMessages = scheduledMessages.filter((message) => {
     const matchesSearch =
       message.contact.toLowerCase().includes(searchTerm.toLowerCase()) ||
       message.message.toLowerCase().includes(searchTerm.toLowerCase())
 
+    const scheduledDate = new Date(message.scheduledFor)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    const tomorrow = new Date(today)
+    tomorrow.setDate(tomorrow.getDate() + 1)
+
+    const isToday =
+      scheduledDate.getDate() === today.getDate() &&
+      scheduledDate.getMonth() === today.getMonth() &&
+      scheduledDate.getFullYear() === today.getFullYear()
+
+    const isTomorrow =
+      scheduledDate.getDate() === tomorrow.getDate() &&
+      scheduledDate.getMonth() === tomorrow.getMonth() &&
+      scheduledDate.getFullYear() === tomorrow.getFullYear()
+
     if (filter === "all") return matchesSearch
-    if (filter === "today") return matchesSearch && message.date === "Apr 29, 2023"
-    if (filter === "tomorrow") return matchesSearch && message.date === "Apr 30, 2023"
-    if (filter === "future") return matchesSearch && message.date !== "Apr 29, 2023" && message.date !== "Apr 30, 2023"
+    if (filter === "today") return matchesSearch && isToday
+    if (filter === "tomorrow") return matchesSearch && isTomorrow
+    if (filter === "future") return matchesSearch && scheduledDate > tomorrow
+
     return matchesSearch
   })
 
@@ -144,32 +93,46 @@ export function ScheduledMessagesList() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredMessages.map((message) => (
-              <TableRow key={message.id}>
-                <TableCell className="font-medium">{message.contact}</TableCell>
-                <TableCell className="max-w-[300px] truncate">{message.message}</TableCell>
-                <TableCell>{message.date}</TableCell>
-                <TableCell>{message.time}</TableCell>
-                <TableCell>
-                  <Badge variant="outline">{message.count}</Badge>
-                </TableCell>
-                <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon">
-                        <MoreHorizontal className="h-4 w-4" />
-                        <span className="sr-only">Open menu</span>
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem>Edit</DropdownMenuItem>
-                      <DropdownMenuItem>Send Now</DropdownMenuItem>
-                      <DropdownMenuItem>Cancel</DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+            {filteredMessages.length > 0 ? (
+              filteredMessages.map((message) => {
+                const scheduledDate = new Date(message.scheduledFor)
+                const formattedDate = scheduledDate.toLocaleDateString()
+                const formattedTime = scheduledDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+
+                return (
+                  <TableRow key={message.id}>
+                    <TableCell className="font-medium">{message.contact}</TableCell>
+                    <TableCell className="max-w-[300px] truncate">{message.message}</TableCell>
+                    <TableCell>{formattedDate}</TableCell>
+                    <TableCell>{formattedTime}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{message.count}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreHorizontal className="h-4 w-4" />
+                            <span className="sr-only">Open menu</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem>Edit</DropdownMenuItem>
+                          <DropdownMenuItem>Send Now</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => cancelScheduledMessage(message.id)}>Cancel</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                )
+              })
+            ) : (
+              <TableRow>
+                <TableCell colSpan={6} className="h-24 text-center">
+                  No scheduled messages found.
                 </TableCell>
               </TableRow>
-            ))}
+            )}
           </TableBody>
         </Table>
       </CardContent>

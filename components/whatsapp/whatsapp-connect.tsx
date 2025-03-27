@@ -9,6 +9,7 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Icons } from "@/components/icons"
+import { useWhatsApp } from "@/lib/hooks/use-whatsapp"
 
 interface WhatsappConnectProps {
   onConnected: () => void
@@ -26,9 +27,10 @@ const phoneFormSchema = z.object({
 })
 
 export function WhatsappConnect({ onConnected }: WhatsappConnectProps) {
-  const [isConnecting, setIsConnecting] = useState(false)
+  const { connectWithQR, connectWithPhone, verifyQRCode, isConnecting } = useWhatsApp()
   const [showQrCode, setShowQrCode] = useState(false)
-  const [qrCodeUrl, setQrCodeUrl] = useState("/placeholder.svg?height=300&width=300")
+  const [qrCodeUrl, setQrCodeUrl] = useState("")
+  const [error, setError] = useState<string | null>(null)
 
   const phoneForm = useForm<z.infer<typeof phoneFormSchema>>({
     resolver: zodResolver(phoneFormSchema),
@@ -37,52 +39,43 @@ export function WhatsappConnect({ onConnected }: WhatsappConnectProps) {
     },
   })
 
-  function onPhoneSubmit(values: z.infer<typeof phoneFormSchema>) {
-    setIsConnecting(true)
-
-    // Simulate API call
-    setTimeout(() => {
-      console.log(values)
-      setIsConnecting(false)
+  async function onPhoneSubmit(values: z.infer<typeof phoneFormSchema>) {
+    setError(null)
+    try {
+      await connectWithPhone(values.phoneNumber)
       onConnected()
-    }, 2000)
-
-    // In a real app, you would call your API here
-    // const response = await fetch("/api/whatsapp/connect", {
-    //   method: "POST",
-    //   headers: { "Content-Type": "application/json" },
-    //   body: JSON.stringify(values),
-    // });
+    } catch (error) {
+      console.error(error)
+      setError(error instanceof Error ? error.message : "Failed to connect with phone number")
+    }
   }
 
-  function onQrConnect() {
-    setIsConnecting(true)
-    setShowQrCode(true)
-
-    // Simulate API call to get QR code
-    setTimeout(() => {
-      setIsConnecting(false)
-      // In a real app, you would get the QR code URL from the API
-      // setQrCodeUrl(response.qrCodeUrl);
-    }, 1500)
-
-    // In a real app, you would call your API here
-    // const response = await fetch("/api/whatsapp/qr-code", {
-    //   method: "GET",
-    // });
+  async function onQrConnect() {
+    setError(null)
+    try {
+      const qrCode = await connectWithQR()
+      setQrCodeUrl(qrCode)
+      setShowQrCode(true)
+    } catch (error) {
+      console.error(error)
+      setError(error instanceof Error ? error.message : "Failed to generate QR code")
+    }
   }
 
-  function onQrCodeScanned() {
-    // Simulate successful QR code scan
-    setIsConnecting(true)
-    setTimeout(() => {
-      setIsConnecting(false)
+  async function onQrCodeScanned() {
+    setError(null)
+    try {
+      await verifyQRCode()
       onConnected()
-    }, 2000)
+    } catch (error) {
+      console.error(error)
+      setError(error instanceof Error ? error.message : "Failed to verify QR code")
+    }
   }
 
   return (
     <Tabs defaultValue="qr" className="space-y-4">
+      {error && <div className="rounded-md bg-destructive/15 p-3 text-sm text-destructive">{error}</div>}
       <TabsList className="grid w-full grid-cols-2">
         <TabsTrigger value="qr">QR Code</TabsTrigger>
         <TabsTrigger value="phone">Phone Number</TabsTrigger>
@@ -106,7 +99,11 @@ export function WhatsappConnect({ onConnected }: WhatsappConnectProps) {
                 <li>3. Point your phone to this screen to capture the code</li>
               </ol>
               <div className="mt-4 rounded-md border p-2">
-                <img src={qrCodeUrl || "/placeholder.svg"} alt="WhatsApp QR Code" className="h-64 w-64" />
+                <img
+                  src={qrCodeUrl || "/placeholder.svg?height=300&width=300"}
+                  alt="WhatsApp QR Code"
+                  className="h-64 w-64"
+                />
               </div>
             </div>
             <div className="flex flex-col space-y-2">
